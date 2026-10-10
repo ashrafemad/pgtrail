@@ -1,0 +1,118 @@
+pgtrail  PostgreSQL 16.15 · backend pid 3284 · xid 762 · warm backend
+
+    update t set name = 'second' where id = 500
+
+ 1  WIRE  what crossed the connection, timed from the first byte sent
+   +  0.000 ms  → Query                      48 B  update t set name = 'second' where id = 500
+   +  0.322 ms  ← NoticeResponse ×6        4256 B  pgtrail instrumentation (stage statistics, plan); a normal client gets none
+   +  0.986 ms  ← CommandComplete            13 B  UPDATE 1
+   +  0.992 ms  ← ReadyForQuery               5 B  in transaction
+   round trip 1.041 ms as seen by the client
+
+ 2  STAGES  time inside the backend, reported by the server itself
+   parse      0.019 ms  SQL text → raw parse tree (syntax only, no catalog access)
+   analyze    0.023 ms  names and types resolved against the catalogs → query tree
+   rewrite    0.007 ms  rules and views expanded
+   plan       0.214 ms  cheapest plan chosen from table statistics
+   execute    0.409 ms  plan nodes run; pages read and modified
+
+ 3  PLAN  as executed; a node's buffer counts include its children
+   Update on t  rows=0 loops=1 time=0.233 ms
+      buffers: hit 10, read 3, dirtied 3
+      read I/O 0.056 ms
+      WAL: 3 records, 15761 B, 2 full-page images
+   └─ Index Scan using t_pkey on t  rows=1 loops=1 time=0.057 ms
+         buffers: hit 1, read 2
+         read I/O 0.039 ms
+         Index Cond: (id = 500)
+
+ 4  LOCKS  held by the backend once the statement finished
+   RowExclusiveLock     t                          fast path · modifying rows; other readers and writers still allowed
+   RowExclusiveLock     t_pkey                     fast path · modifying rows; other readers and writers still allowed
+   ExclusiveLock        xid 762                    shared lock table · held on its own transaction id so others can wait for it
+   ExclusiveLock        virtual xid 4/68           fast path · held on its own transaction id so others can wait for it
+
+ 5  BUFFER CACHE  pages in shared_buffers whose state changed
+   t [fsm] (table)
+      block 0       hit                       usage 1→2
+      block 1       hit                       usage 1→2
+      block 2       hit                       usage 1→2
+   t (table)
+      block 2       read in + modified        usage -→1
+      block 5       modified                  usage 3→4
+   t [vm] (table)
+      block 0       read in + dirtied, no WAL record usage -→1
+   t_pkey (index)
+      block 2       read in + modified        usage -→2
+      block 3       hit                       usage 2→4
+   8 page(s) changed state: 3 read in from the OS, 3 modified (WAL-logged), 1 dirtied without a WAL record of its own (hint bits, free space or visibility map)
+   usage count stops at 5, so hits on very hot pages are invisible here; the plan's 'hit' numbers are exact
+
+ 6  WAL  records written to the log, in order
+   0/2CB0318    Heap/LOCK                     8223 B (8164 FPI)  t blk 2 FPI
+   0/2CB2350    Heap/UPDATE                                85 B  t blk 5, t blk 2
+   0/2CB23A8    Btree/INSERT_LEAF             7453 B (7400 FPI)  t_pkey blk 2 FPI
+   0/2CB40E0    Transaction/COMMIT                         34 B  
+   4 record(s), 15795 bytes for this transaction
+   FPI = full-page image: the first change to a page after a checkpoint logs the whole page
+
+ 7  PAGES  the blocks named by those WAL records, read back with pageinspect
+   t block 2 (heap)  185 line pointers (185 normal), lower 764, upper 792, 28 B free, page LSN 0/2CB23A8
+     lp 112  at offset 3712    33 B  old version, xmax 762 → new version at (5,63)
+   t block 5 (heap)  63 line pointers (63 normal), lower 276, upper 5680, 5404 B free, page LSN 0/2CB23A8
+     lp 63   at offset 5680    35 B  new tuple, xmin 762 (500,second)
+   t_pkey block 2 (btree leaf, level 0)  368 live items, 0 dead, 788 B free, page LSN 0/2CB40E0
+     item 136  → heap tuple (5,63)  key bytes f4 01 00 00 00 00 00 00
+
+ 8  COMMIT
+   +  0.000 ms  → Query                      11 B  COMMIT
+   +  1.314 ms  ← CommandComplete            11 B  COMMIT
+   +  1.327 ms  ← ReadyForQuery               5 B  idle
+   1.390 ms. With synchronous_commit = on, the backend waits here until the WAL is flushed to disk.
+
+ 9  AFTERMATH  what is still only in memory
+   4 of 4 changed page(s) are still dirty in shared_buffers. The data files have not been written;
+   only the WAL has the change. The checkpointer or background writer writes the pages later.
+   CHECKPOINT forced: 4.7 ms, 0 page(s) still dirty afterwards.
+
+10  SYSCALLS  strace on the backend and the background processes
+   statement
+   +    0.203 ms  backend           recvfrom   client socket                  receive TLS record header from client, 5 bytes  0.002 ms
+   +    0.225 ms  backend           recvfrom   client socket                  receive TLS record body from client, 66 bytes  0.002 ms
+   +    0.277 ms  backend           sendto     client socket                  send to client, 435 bytes (pgtrail instrumentation notice)  0.006 ms
+   +    0.326 ms  backend           sendto     client socket                  send to client, 443 bytes (pgtrail instrumentation notice)  0.004 ms
+   +    0.355 ms  backend           sendto     client socket                  send to client, 437 bytes (pgtrail instrumentation notice)  0.004 ms
+   +    0.382 ms  backend           openat     t                              open the data file  0.072 ms
+   +    0.511 ms  backend           lseek      t                              ask the file size: 6 block(s)  0.002 ms
+   +    0.527 ms  backend           openat     t_pkey                         open the data file  0.003 ms
+   +    0.542 ms  backend           lseek      t_pkey                         ask the file size: 5 block(s)  0.002 ms
+   +    0.593 ms  backend           sendto     client socket                  send to client, 437 bytes (pgtrail instrumentation notice)  0.016 ms
+   +    0.657 ms  backend           pread64    t_pkey                         read block 2 from the OS (page cache or disk)  0.012 ms
+   +    0.687 ms  backend           pread64    t                              read block 2 from the OS (page cache or disk)  0.006 ms
+   +    0.723 ms  backend           openat     t [vm]                         open the data file  0.004 ms
+   +    0.741 ms  backend           lseek      t [vm]                         ask the file size: 1 block(s)  0.002 ms
+   +    0.750 ms  backend           pread64    t [vm]                         read block 0 from the OS (page cache or disk)  0.009 ms
+   +    0.781 ms  backend           openat     t [fsm]                        open the data file  0.003 ms
+   +    0.794 ms  backend           lseek      t [fsm]                        ask the file size: 3 block(s)  0.002 ms
+   +    0.938 ms  backend           sendto     client socket                  send to client, 2202 bytes (pgtrail instrumentation notice)  0.016 ms
+   +    1.049 ms  backend           sendto     client socket                  send to client, 440 bytes (pgtrail instrumentation notice)  0.010 ms
+   +    1.081 ms  backend           sendto     client socket                  send to client, 42 bytes  0.004 ms
+   commit
+   +    8.431 ms  backend           recvfrom   client socket                  receive TLS record header from client, 5 bytes  0.005 ms
+   +    8.490 ms  backend           recvfrom   client socket                  receive TLS record body from client, 29 bytes  0.002 ms
+   +    8.543 ms  backend           sendto     client socket                  send to client, 436 bytes (pgtrail instrumentation notice)  0.062 ms
+   +    8.636 ms  backend           sendto     client socket                  send to client, 444 bytes (pgtrail instrumentation notice)  0.023 ms
+   +    8.688 ms  backend           sendto     client socket                  send to client, 438 bytes (pgtrail instrumentation notice)  0.019 ms
+   +    8.791 ms  backend           openat     WAL 000000010000000000000002   open WAL segment  0.036 ms
+   +    8.861 ms  backend           pwrite64   WAL 000000010000000000000002   write 24576 bytes of WAL at offset 13303808  0.031 ms
+   +    8.934 ms  backend           fdatasync  WAL 000000010000000000000002   flush WAL to stable storage (the durability point)  0.513 ms
+   +    9.564 ms  backend           sendto     client socket                  send to client, 40 bytes  0.517 ms
+   checkpoint
+   +   24.509 ms  checkpointer      pwrite64   t                              write block 2 to the OS page cache  0.006 ms  ← changed by this statement
+   +   24.527 ms  checkpointer      pwrite64   t                              write block 5 to the OS page cache  0.004 ms  ← changed by this statement
+   +   24.583 ms  checkpointer      pwrite64   t_pkey                         write block 2 to the OS page cache  0.004 ms  ← changed by this statement
+   +   24.798 ms  checkpointer      fsync      t                              force this data file to stable storage  0.211 ms  ← changed by this statement
+   +   25.021 ms  checkpointer      fsync      t_pkey                         force this data file to stable storage  0.029 ms  ← changed by this statement
+   … and 50 other syscall(s): other dirty pages, housekeeping (--json has all of them)
+   the connection uses TLSv1.3, so socket sizes include the TLS record overhead; add sslmode=disable to the DSN for raw sizes
+   strace slows the traced processes, so timings above are inflated in this run

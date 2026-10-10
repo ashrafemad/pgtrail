@@ -1,0 +1,10 @@
+# local environment
+.venv/
+# the throwaway test database (scripts/testdb.sh)
+.testdb/
+# Python build and cache files
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/

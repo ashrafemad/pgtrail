@@ -1,0 +1,16 @@
+[project]
+name = "pgtrail"
+version = "0.1.0"
+description = "Follow one SQL statement through PostgreSQL: wire protocol, parse/plan/execute, locks, buffer cache, WAL, pages, syscalls."
+requires-python = ">=3.10"
+dependencies = ["psycopg[binary]>=3.1"]
+
+[project.scripts]
+pgtrail = "pgtrail.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["pgtrail*"]

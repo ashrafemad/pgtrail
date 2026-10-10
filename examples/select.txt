@@ -1,0 +1,57 @@
+pgtrail  PostgreSQL 16.15 · backend pid 3290 · xid none (read-only so far) · warm backend
+
+    select * from big where id = 99999
+
+ 1  WIRE  what crossed the connection, timed from the first byte sent
+   +  0.000 ms  → Query                      39 B  select * from big where id = 99999
+   +  0.331 ms  ← NoticeResponse ×4        1659 B  pgtrail instrumentation (stage statistics, plan); a normal client gets none
+   +  0.353 ms  ← RowDescription             50 B  2 column(s)
+   +  0.356 ms  ← DataRow                    51 B  
+   +  0.359 ms  ← NoticeResponse ×2        1535 B  pgtrail instrumentation (stage statistics, plan); a normal client gets none
+   +  0.369 ms  ← CommandComplete            13 B  SELECT 1
+   +  0.371 ms  ← ReadyForQuery               5 B  in transaction
+   round trip 0.412 ms as seen by the client
+   1 row(s): id | body  (99999, d3eb9a9233e52948740d7eb8c3062d14)
+
+ 2  STAGES  time inside the backend, reported by the server itself
+   parse      0.011 ms  SQL text → raw parse tree (syntax only, no catalog access)
+   analyze    0.016 ms  names and types resolved against the catalogs → query tree
+   rewrite    0.002 ms  rules and views expanded
+   plan       0.043 ms  cheapest plan chosen from table statistics
+   execute    0.075 ms  plan nodes run; pages read and modified
+
+ 3  PLAN  as executed; a node's buffer counts include its children
+   Index Scan using big_id_idx on big  rows=1 loops=1 time=0.07 ms
+      buffers: hit 2, read 2
+      read I/O 0.051 ms
+      Index Cond: (id = 99999)
+
+ 4  LOCKS  held by the backend once the statement finished
+   AccessShareLock      big                        fast path · reading; only blocks DROP / ALTER / VACUUM FULL
+   AccessShareLock      big_id_idx                 fast path · reading; only blocks DROP / ALTER / VACUUM FULL
+   ExclusiveLock        virtual xid 4/85           fast path · held on its own transaction id so others can wait for it
+
+ 5  BUFFER CACHE  pages in shared_buffers whose state changed
+   big (table)
+      block 833     read in                   usage -→1
+   big_id_idx (index)
+      block 3       hit                       usage 1→2
+      block 275     read in                   usage -→1
+      block 290     hit                       usage 1→2
+   4 page(s) changed state: 2 read in from the OS
+   usage count stops at 5, so hits on very hot pages are invisible here; the plan's 'hit' numbers are exact
+
+ 6  WAL  records written to the log, in order
+   nothing written; reads do not touch the log
+
+ 7  PAGES  the blocks named by those WAL records, read back with pageinspect
+   no pages were modified
+
+ 8  COMMIT
+   +  0.000 ms  → Query                      11 B  COMMIT
+   +  0.203 ms  ← CommandComplete            11 B  COMMIT
+   +  0.206 ms  ← ReadyForQuery               5 B  idle
+   0.244 ms. No xid was assigned, so there is nothing to flush.
+
+ 9  AFTERMATH  what is still only in memory
+   no pages were changed
